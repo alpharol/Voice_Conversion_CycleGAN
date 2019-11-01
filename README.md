@@ -12,7 +12,7 @@
 
 ### Model Structure
 
-![image](https://github.com/alpharol/Voice_Conversion_CycleGAN/raw/master/CNN_structure.png)
+![image](https://github.com/alpharol/Voice_Conversion_CycleGAN/raw/master/figure/CycleGAN.png)
 
 *Note: The channel of residual block may be wrong.*
 
