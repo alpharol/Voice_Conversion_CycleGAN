@@ -57,7 +57,7 @@ librosa 0.5.1
 python preprocess.py
 ```
 
-This process may take 13 minutes if using the same datasets.
+This process may take 13 minutes if using the same datasets. The processed data is stored in the directory `training_data`.
 
 <br/>
 
@@ -67,7 +67,7 @@ This process may take 13 minutes if using the same datasets.
 python train.py
 ```
 
-It may take 5 minutes for one epoch. In order to get a good voice quality, 800 epoches are needed. 
+It may take 1 minutes for one epoch. In order to get a good voice quality, 500 epoch are needed. 
 
 If the other speakers are involved, please change the directory below.
 
@@ -94,5 +94,12 @@ The converted voice can be found in the directory below:
 
 ### To-Do 
 
+
+
+- [x] Separate the preprocess from the training steps.
+- [x] Add process bar to the code.
+- [x] accelerate the training speed through saving the models by 100 epoch.
+- [x] Add the training module based on the pretrain model.
+- [x] Add the module of saving the last five epoch.
 - [ ] Provide some converted samples.
 
