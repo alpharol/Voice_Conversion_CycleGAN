@@ -1,4 +1,6 @@
+import os
 import tensorflow as tf 
+
 
 def gated_linear_layer(inputs, gates, name = None):
 

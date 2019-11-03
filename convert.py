@@ -1,11 +1,11 @@
 import argparse
 import os
 import numpy as np
-
+from tqdm import trange
 from model import CycleGAN
 from preprocess import *
 
-def conversion(model_dir, model_name, data_dir, conversion_direction, output_dir):
+def conversion(training_data_dir, model_dir, model_name, data_dir, conversion_direction, output_dir):
 
     num_features = 24
     sampling_rate = 16000
@@ -13,15 +13,24 @@ def conversion(model_dir, model_name, data_dir, conversion_direction, output_dir
 
     model = CycleGAN(num_features = num_features, mode = 'test')
 
-    model.load(filepath = os.path.join(model_dir, model_name))
 
-    mcep_normalization_params = np.load(os.path.join(model_dir, 'mcep_normalization.npz'))
+    if os.path.exists(os.path.join(model_dir, "checkpoint")) == True:
+        f = open(os.path.join(model_dir, "checkpoint"),"r")
+        all_ckpt = f.readlines()
+        f.close()
+        pretrain_ckpt = all_ckpt[-1].split("\n")[0].split("\"")[1]
+        assert os.path.exists(os.path.join(model_dir, (pretrain_ckpt+".index"))) == True, "The checkpoint is not exist."
+        model.load(filepath=os.path.join(model_dir, pretrain_ckpt))
+        print("Loading pretrained model {}".format(pretrain_ckpt))
+
+
+    mcep_normalization_params = np.load(os.path.join(training_data_dir, 'mcep_normalization.npz'))
     mcep_mean_A = mcep_normalization_params['mean_A']
     mcep_std_A = mcep_normalization_params['std_A']
     mcep_mean_B = mcep_normalization_params['mean_B']
     mcep_std_B = mcep_normalization_params['std_B']
 
-    logf0s_normalization_params = np.load(os.path.join(model_dir, 'logf0s_normalization.npz'))
+    logf0s_normalization_params = np.load(os.path.join(training_data_dir, 'logf0s_normalization.npz'))
     logf0s_mean_A = logf0s_normalization_params['mean_A']
     logf0s_std_A = logf0s_normalization_params['std_A']
     logf0s_mean_B = logf0s_normalization_params['mean_B']
@@ -30,8 +39,8 @@ def conversion(model_dir, model_name, data_dir, conversion_direction, output_dir
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    for file in os.listdir(data_dir):
-
+    for i in trange(len(os.listdir(data_dir))):
+        file = os.listdir(data_dir)[i]
         filepath = os.path.join(data_dir, file)
         wav, _ = librosa.load(filepath, sr = sampling_rate, mono = True)
         wav = wav_padding(wav = wav, sr = sampling_rate, frame_period = frame_period, multiple = 4)
@@ -63,12 +72,14 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description = 'Convert voices using pre-trained CycleGAN model.')
 
-    model_dir_default = './model/sf1_tm1'
-    model_name_default = 'sf1_tm1.ckpt'
+    training_data_dir_default = "./training_data" 
+    model_dir_default = './model'
+    model_name_default = 'sf1_tm1'
     data_dir_default = './data/evaluation_all/SF1'
     conversion_direction_default = 'A2B'
     output_dir_default = './converted_voices'
 
+    parser.add_argument('--training_data_dir', type = str, help = 'Directory for the data.', default = training_data_dir_default)
     parser.add_argument('--model_dir', type = str, help = 'Directory for the pre-trained model.', default = model_dir_default)
     parser.add_argument('--model_name', type = str, help = 'Filename for the pre-trained model.', default = model_name_default)
     parser.add_argument('--data_dir', type = str, help = 'Directory for the voices for conversion.', default = data_dir_default)
@@ -77,12 +88,13 @@ if __name__ == '__main__':
 
     argv = parser.parse_args()
 
+    training_data_dir = argv.training_data_dir
     model_dir = argv.model_dir
     model_name = argv.model_name
     data_dir = argv.data_dir
     conversion_direction = argv.conversion_direction
     output_dir = argv.output_dir
 
-    conversion(model_dir = model_dir, model_name = model_name, data_dir = data_dir, conversion_direction = conversion_direction, output_dir = output_dir)
+    conversion(training_data_dir = training_data_dir, model_dir = model_dir, model_name = model_name, data_dir = data_dir, conversion_direction = conversion_direction, output_dir = output_dir)
 
 

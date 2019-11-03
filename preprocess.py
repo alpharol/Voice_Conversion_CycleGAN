@@ -8,7 +8,7 @@ import argparse
 import time
 import pickle
 
-def preprocess(train_A_dir, train_B_dir, model_dir, random_seed):
+def preprocess(train_A_dir, train_B_dir, training_data_dir, random_seed):
 
     np.random.seed(random_seed)
     sampling_rate = 16000
@@ -42,23 +42,16 @@ def preprocess(train_A_dir, train_B_dir, model_dir, random_seed):
     coded_sps_A_norm, coded_sps_A_mean, coded_sps_A_std = coded_sps_normalization_fit_transoform(coded_sps = coded_sps_A_transposed)
     coded_sps_B_norm, coded_sps_B_mean, coded_sps_B_std = coded_sps_normalization_fit_transoform(coded_sps = coded_sps_B_transposed)
 
-    # print(type(coded_sps_A_norm))
-    # print(type(coded_sps_A_norm[0]))
-    # print(len(coded_sps_A_norm))
-    # print(len(coded_sps_A_norm[0]))
-    # print(coded_sps_A_norm[0].shape)
-    # print(coded_sps_A_norm[1].shape)
 
+    if not os.path.exists(training_data_dir):
+        os.makedirs(training_data_dir)
+    np.savez(os.path.join(training_data_dir, 'logf0s_normalization.npz'), mean_A = log_f0s_mean_A, std_A = log_f0s_std_A, mean_B = log_f0s_mean_B, std_B = log_f0s_std_B)
+    np.savez(os.path.join(training_data_dir, 'mcep_normalization.npz'), mean_A = coded_sps_A_mean, std_A = coded_sps_A_std, mean_B = coded_sps_B_mean, std_B = coded_sps_B_std)
 
-    if not os.path.exists(model_dir):
-        os.makedirs(model_dir)
-    np.savez(os.path.join(model_dir, 'logf0s_normalization.npz'), mean_A = log_f0s_mean_A, std_A = log_f0s_std_A, mean_B = log_f0s_mean_B, std_B = log_f0s_std_B)
-    np.savez(os.path.join(model_dir, 'mcep_normalization.npz'), mean_A = coded_sps_A_mean, std_A = coded_sps_A_std, mean_B = coded_sps_B_mean, std_B = coded_sps_B_std)
-
-    with open(os.path.join(model_dir, 'A_coded_norm.pk'),"wb") as fa:
+    with open(os.path.join(training_data_dir, 'A_coded_norm.pk'),"wb") as fa:
         pickle.dump(coded_sps_A_norm,fa)
 
-    with open(os.path.join(model_dir, 'B_coded_norm.pk'),"wb") as fb:
+    with open(os.path.join(training_data_dir, 'B_coded_norm.pk'),"wb") as fb:
         pickle.dump(coded_sps_B_norm,fb)
 
     
@@ -72,20 +65,20 @@ def preprocess(train_A_dir, train_B_dir, model_dir, random_seed):
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(description = 'Train CycleGAN model for datasets.')
+    parser = argparse.ArgumentParser(description = 'Preprocess the Data.')
 
     train_A_dir_default = './data/vcc2016_training/SF1'
     train_B_dir_default = './data/vcc2016_training/TM1'
-    model_dir_default = './model/sf1_tm1'
+    training_data_dir_default = './training_data'
 
     parser.add_argument('--train_A_dir', type = str, help = 'Directory for A.', default = train_A_dir_default)
     parser.add_argument('--train_B_dir', type = str, help = 'Directory for B.', default = train_B_dir_default)
-    parser.add_argument('--model_dir', type = str, help = 'Directory for saving models.', default = model_dir_default)
+    parser.add_argument('--training_data_dir', type = str, help = 'Directory for training data', default = training_data_dir_default)
  
     argv = parser.parse_args()
 
     train_A_dir = argv.train_A_dir
     train_B_dir = argv.train_B_dir
-    model_dir = argv.model_dir
+    training_data_dir = argv.training_data_dir
    
-    preprocess(train_A_dir = train_A_dir, train_B_dir = train_B_dir, model_dir = model_dir, random_seed = 0)
+    preprocess(train_A_dir = train_A_dir, train_B_dir = train_B_dir, training_data_dir = training_data_dir, random_seed = 0)

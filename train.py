@@ -5,19 +5,17 @@ import time
 import librosa
 from tqdm import trange
 import pickle
-
+from tqdm import trange
 from utils import *
 from model import CycleGAN
 
 
-
-
-def train(train_A_dir, train_B_dir, model_dir, model_name, random_seed, validation_A_dir, validation_B_dir, output_dir):
+def train(train_A_dir, train_B_dir, training_data_dir, model_dir, model_name, random_seed, validation_A_dir, validation_B_dir, output_dir):
 
     np.random.seed(random_seed)
 
-    num_epochs = 5000
-    mini_batch_size = 1 # mini_batch_size = 1 is better
+    num_epochs = 2000
+    mini_batch_size = 1 
     generator_learning_rate = 0.0002
     generator_learning_rate_decay = generator_learning_rate / 200000
     discriminator_learning_rate = 0.0001
@@ -28,25 +26,24 @@ def train(train_A_dir, train_B_dir, model_dir, model_name, random_seed, validati
     n_frames = 128
     lambda_cycle = 10
     lambda_identity = 5
-    max_samples = 1000
 
   
-    print("****************************************************************")
-    print("*************************Loading DATA*************************")
-    print("****************************************************************")
-    with open(os.path.join(model_dir, 'A_coded_norm.pk'),"rb") as fa:
+    # ****************************************************************
+    # *************************Loading DATA***************************
+    # ****************************************************************
+    with open(os.path.join(training_data_dir, 'A_coded_norm.pk'),"rb") as fa:
         coded_sps_A_norm = pickle.load(fa)
 
-    with open(os.path.join(model_dir, 'B_coded_norm.pk'),"rb") as fb:
+    with open(os.path.join(training_data_dir, 'B_coded_norm.pk'),"rb") as fb:
         coded_sps_B_norm = pickle.load(fb)
 
-    mcep_normalization_params = np.load(os.path.join(model_dir, 'mcep_normalization.npz'))
+    mcep_normalization_params = np.load(os.path.join(training_data_dir, 'mcep_normalization.npz'))
     coded_sps_A_mean = mcep_normalization_params['mean_A']
     coded_sps_A_std = mcep_normalization_params['std_A']
     coded_sps_B_mean = mcep_normalization_params['mean_B']
     coded_sps_B_std = mcep_normalization_params['std_B']
 
-    logf0s_normalization_params = np.load(os.path.join(model_dir, 'logf0s_normalization.npz'))
+    logf0s_normalization_params = np.load(os.path.join(training_data_dir, 'logf0s_normalization.npz'))
     log_f0s_mean_A = logf0s_normalization_params['mean_A']
     log_f0s_std_A = logf0s_normalization_params['std_A']
     log_f0s_mean_B = logf0s_normalization_params['mean_B']
@@ -63,36 +60,39 @@ def train(train_A_dir, train_B_dir, model_dir, model_name, random_seed, validati
         if not os.path.exists(validation_B_output_dir):
             os.makedirs(validation_B_output_dir)
 
-
+    if not os.path.exists(model_dir):
+        os.makedirs(model_dir)
     print("****************************************************************")
     print("*************************Start Training*************************")
     print("****************************************************************")
 
     model = CycleGAN(num_features = num_mcep)
 
-    for epoch in range(num_epochs):
-        print('Epoch: %d' % epoch)
-        '''
-        if epoch > 60:
-            lambda_identity = 0
-        if epoch > 1250:
-            generator_learning_rate = max(0, generator_learning_rate - 0.0000002)
-            discriminator_learning_rate = max(0, discriminator_learning_rate - 0.0000001)
-        '''
+    epoch = 0
+    # load model
+    if os.path.exists(os.path.join(model_dir, "checkpoint")) == True:
+        f = open(os.path.join(model_dir, "checkpoint"),"r")
+        all_ckpt = f.readlines()
+        f.close()
+        pretrain_ckpt = all_ckpt[-1].split("\n")[0].split("\"")[1]
+        epoch = int(pretrain_ckpt.split("-")[1].split(".")[0])
+        if os.path.exists(os.path.join(model_dir, (pretrain_ckpt+".index"))) == True:
+            model.load(filepath=os.path.join(model_dir, pretrain_ckpt))
+            print("Loading pretrained model {}".format(pretrain_ckpt))
+    else:
+        print("Training model from 0 epoch")
+
+    for k in range(epoch+1, num_epochs):
+        print('Epoch: %d' % k)
 
         start_time_epoch = time.time()
-
         pool_A, pool_B = list(coded_sps_A_norm), list(coded_sps_B_norm)
-        dataset_A, dataset_B = sample_train_data(pool_A=pool_A, pool_B=pool_B, n_frames=n_frames, max_samples=max_samples)
+        dataset_A, dataset_B = sample_train_data(dataset_A=pool_A, dataset_B=pool_B, n_frames=n_frames)
         print('dataset_A', np.shape(dataset_A), 'dataset_B', np.shape(dataset_B))
-        # dataset_A, dataset_B = sample_train_data_old(dataset_A = coded_sps_A_norm, dataset_B = coded_sps_B_norm, n_frames = n_frames)
-
         n_samples = dataset_A.shape[0]
 
-        for i in range(n_samples // mini_batch_size):
-
+        for i in trange(n_samples // mini_batch_size):
             num_iterations = n_samples // mini_batch_size * epoch + i
-
             if num_iterations > 10000:
                 lambda_identity = 0
             if num_iterations > 200000:
@@ -104,11 +104,13 @@ def train(train_A_dir, train_B_dir, model_dir, model_name, random_seed, validati
 
             generator_loss, discriminator_loss = model.train(input_A = dataset_A[start:end], input_B = dataset_B[start:end], lambda_cycle = lambda_cycle, lambda_identity = lambda_identity, generator_learning_rate = generator_learning_rate, discriminator_learning_rate = discriminator_learning_rate)
 
-            if i % 50 == 0:
-                #print('Iteration: %d, Generator Loss : %f, Discriminator Loss : %f' % (num_iterations, generator_loss, discriminator_loss))
+            if i % (n_samples//2) == 0:
                 print('Iteration: {:07d}, Generator Learning Rate: {:.7f}, Discriminator Learning Rate: {:.7f}, Generator Loss : {:.3f}, Discriminator Loss : {:.3f}'.format(num_iterations, generator_learning_rate, discriminator_learning_rate, generator_loss, discriminator_loss))
 
-        model.save(directory = model_dir, filename = model_name)
+        if k == 1 or k % 100 == 0:
+            print("Saving Epoch {}".format(k))
+            ckpt_name = model_name + "-" + str(k) + ".ckpt"
+            model.save(directory = model_dir, filename = ckpt_name)
 
         end_time_epoch = time.time()
         time_elapsed_epoch = end_time_epoch - start_time_epoch
@@ -116,9 +118,10 @@ def train(train_A_dir, train_B_dir, model_dir, model_name, random_seed, validati
         print('Time Elapsed for This Epoch: %02d:%02d:%02d' % (time_elapsed_epoch // 3600, (time_elapsed_epoch % 3600 // 60), (time_elapsed_epoch % 60 // 1)))
 
         if validation_A_dir is not None:
-            if epoch % 100 == 0:
+            if k % 300 == 0:
                 print('Generating Validation Data B from A...')
-                for file in os.listdir(validation_A_dir):
+                for i in trange(len(os.listdir(validation_A_dir))):
+                    file = os.listdir(validation_A_dir)[i]
                     filepath = os.path.join(validation_A_dir, file)
                     wav, _ = librosa.load(filepath, sr = sampling_rate, mono = True)
                     wav = wav_padding(wav = wav, sr = sampling_rate, frame_period = frame_period, multiple = 4)
@@ -136,9 +139,10 @@ def train(train_A_dir, train_B_dir, model_dir, model_name, random_seed, validati
                     librosa.output.write_wav(os.path.join(validation_A_output_dir, os.path.basename(file)), wav_transformed, sampling_rate)
 
         if validation_B_dir is not None:
-            if epoch % 100 == 0:
+            if k % 300 == 0:
                 print('Generating Validation Data A from B...')
-                for file in os.listdir(validation_B_dir):
+                for i in trange(len(os.listdir(validation_B_dir))):
+                    file = os.listdir(validation_A_dir)[i]
                     filepath = os.path.join(validation_B_dir, file)
                     wav, _ = librosa.load(filepath, sr = sampling_rate, mono = True)
                     wav = wav_padding(wav = wav, sr = sampling_rate, frame_period = frame_period, multiple = 4)
@@ -161,16 +165,17 @@ if __name__ == '__main__':
 
     train_A_dir_default = './data/vcc2016_training/SF1'
     train_B_dir_default = './data/vcc2016_training/TM1'
-    model_dir_default = './model/sf1_tm1'
-    model_name_default = 'sf1_tm1.ckpt'
+    training_data_dir_default = "./training_data"
+    model_dir_default = './model/'
+    model_name_default = 'sf1_tm1'
     random_seed_default = 0
     validation_A_dir_default = './data/evaluation_all/SF1'
     validation_B_dir_default = './data/evaluation_all/TM1'
     output_dir_default = './validation_output'
-    tensorboard_log_dir_default = './log'
 
     parser.add_argument('--train_A_dir', type = str, help = 'Directory for A.', default = train_A_dir_default)
     parser.add_argument('--train_B_dir', type = str, help = 'Directory for B.', default = train_B_dir_default)
+    parser.add_argument('--training_data_dir', type = str, help = 'Directory for data', default = training_data_dir_default)
     parser.add_argument('--model_dir', type = str, help = 'Directory for saving models.', default = model_dir_default)
     parser.add_argument('--model_name', type = str, help = 'File name for saving model.', default = model_name_default)
     parser.add_argument('--random_seed', type = int, help = 'Random seed for model training.', default = random_seed_default)
@@ -183,6 +188,7 @@ if __name__ == '__main__':
 
     train_A_dir = argv.train_A_dir
     train_B_dir = argv.train_B_dir
+    training_data_dir = argv.training_data_dir
     model_dir = argv.model_dir
     model_name = argv.model_name
     random_seed = argv.random_seed
@@ -191,4 +197,4 @@ if __name__ == '__main__':
     output_dir = argv.output_dir
     
 
-    train(train_A_dir = train_A_dir, train_B_dir = train_B_dir, model_dir = model_dir, model_name = model_name, random_seed = random_seed, validation_A_dir = validation_A_dir, validation_B_dir = validation_B_dir, output_dir = output_dir)
+    train(train_A_dir = train_A_dir, train_B_dir = train_B_dir, training_data_dir = training_data_dir, model_dir = model_dir, model_name = model_name, random_seed = random_seed, validation_A_dir = validation_A_dir, validation_B_dir = validation_B_dir, output_dir = output_dir)
