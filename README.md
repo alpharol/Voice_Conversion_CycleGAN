@@ -98,8 +98,8 @@ The converted voice can be found in the directory below:
 
 - [x] Separate the preprocess from the training steps.
 - [x] Add process bar to the code.
-- [x] accelerate the training speed through saving the models by 100 epoch.
+- [x] Accelerate the training speed through saving the models by 100 epoch.
 - [x] Add the training module based on the pretrain model.
 - [x] Add the module of saving the last five epoch.
-- [ ] Provide some converted samples.
+- [x] Provide some converted samples.
 
