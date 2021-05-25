@@ -4,7 +4,7 @@
 
 ### Paper and Dataset
 
-**Paper：**[Parallel-Data-Free Voice Conversion Using Cycle-Consistent Adversarial Networks](https://arxiv.org/abs/1711.11293)
+**Paper：**[CycleGAN-VC: Non-parallel Voice Conversion Using Cycle-Consistent Adversarial Networks  ](https://ieeexplore.ieee.org/abstract/document/8553236?casa_token=nEkt-SBQoPoAAAAA:9VLqcVdeP_O4Cuhr6GLreLo8Y8Ph1eo0SGdVwd_24Dq0PaAEnEmjIpZQ6PkulcoH92zcbL4)
 
 **Dataset：**[VCC2016](https://datashare.is.ed.ac.uk/handle/10283/2211)
 
